@@ -3,11 +3,7 @@ import os
 import google.generativeai as genai
 from dotenv import load_dotenv
 import re
-from datetime import datetime, timedelta
 from flask_cors import CORS
-from deep_translator import GoogleTranslator
-from cachetools import TTLCache
-from pycountry import languages
 import asyncio
 
 load_dotenv()
@@ -21,31 +17,37 @@ genai.configure(api_key=os.environ.get("GOOGLE_AI_API_KEY"))
 # Set up cache
 
 # Compile regex patterns once
-
+tf_pattern = re.compile(r'"thought_process":\s*"([^"]+)"')
 def generate_response(question, answer, emotions):
     prompt = f"""
-Analyze the following information to determine why the candidate selected the given answer, and provide the correct answer. The analysis should consider the candidate's emotional state.
+Analyze the following information to determine the candidate's thought process for selecting the given answer. The analysis should consider the candidate's emotional state.
 
 - Question: {question}
 - Given Answer: {answer}
 - Candidate's Emotions: {emotions}
 
-Provide the output in english language and JSON format with the following structure:
+Provide the reasoning behind why the candidate selected the answer. Format the response as JSON under the heading "thought_process" with the following structure:
+
 {{
-  "reason": "Detailed explanation of why the candidate chose the wrong answer",
-  "correct_answer": "The correct answer"
+  "thought_process": ""
 }}
 """
-    
+    pattern = tf_pattern
     model = genai.GenerativeModel(model_name="gemini-pro")
     response = model.generate_content(prompt)
     generated_text = response.text
     # Print or log the response to inspect its structure
-    print(generated_text)  # Or use logging if necessary
+    # print(generated_text)  # Or use logging if necessary
+    matches = pattern.findall(generated_text)
+    print(generated_text)
+    print(matches)
+    mcq_data = []
+    mcq_data.append({
+                "reason": matches,
+            })
+
     
-    return generated_text
-
-
+    return mcq_data
 
 async def process_questions(data):
 
@@ -63,6 +65,7 @@ async def process_questions(data):
 def generate_question_endpoint():
     """API endpoint to generate questions and answers."""
     data = request.json
+    print("workingg")
     response, status_code = asyncio.run(process_questions(data))
     return jsonify(response), status_code
 
